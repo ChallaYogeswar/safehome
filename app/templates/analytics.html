@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics - SafeHome{% endblock %}
+
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-graph-up"></i> Analytics</h2>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Detection Trends (7 Days)</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="detectionsChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Alert Distribution</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="alertsChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Top Detected Objects</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="objectsChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5>Camera Activity</h5>
+            </div>
+            <div class="card-body">
+                <div id="cameraStats"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+async function loadAnalytics() {
+    const detections = await fetch('/analytics/detections?days=7').then(r => r.json());
+    const alerts = await fetch('/analytics/alerts?days=7').then(r => r.json());
+    const cameras = await fetch('/analytics/cameras').then(r => r.json());
+    
+    if (detections.success) {
+        new Chart(document.getElementById('detectionsChart'), {
+            type: 'line',
+            data: {
+                labels: detections.daily_detections.map(d => d.date),
+                datasets: [{
+                    label: 'Detections',
+                    data: detections.daily_detections.map(d => d.count),
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.1
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+        
+        if (detections.top_objects.length > 0) {
+            new Chart(document.getElementById('objectsChart'), {
+                type: 'bar',
+                data: {
+                    labels: detections.top_objects.map(o => o.class),
+                    datasets: [{
+                        label: 'Count',
+                        data: detections.top_objects.map(o => o.count),
+                        backgroundColor: 'rgba(54, 162, 235, 0.5)'
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+    }
+    
+    if (alerts.success) {
+        new Chart(document.getElementById('alertsChart'), {
+            type: 'doughnut',
+            data: {
+                labels: alerts.alerts_by_severity.map(a => a.severity),
+                datasets: [{
+                    data: alerts.alerts_by_severity.map(a => a.count),
+                    backgroundColor: ['#0dcaf0', '#ffc107', '#fd7e14', '#dc3545']
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    }
+    
+    if (cameras.success) {
+        const html = cameras.cameras.map(c => `
+            <div class="mb-3">
+                <h6>${c.name} <span class="badge bg-${c.is_active ? 'success' : 'secondary'}">${c.is_active ? 'Active' : 'Inactive'}</span></h6>
+                <p class="mb-1">Total: ${c.total_detections} | Last 24h: ${c.last_24h_detections}</p>
+            </div>
+        `).join('');
+        document.getElementById('cameraStats').innerHTML = html;
+    }
+}
+
+loadAnalytics();
+</script>
+{% endblock %}

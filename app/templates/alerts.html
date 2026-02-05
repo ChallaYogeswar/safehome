@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Alerts - SafeHome{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-bell"></i> Alerts</h2>
+    <button class="btn btn-outline-secondary" onclick="clearAllAlerts()">
+        <i class="bi bi-check-all"></i> Mark All as Read
+    </button>
+</div>
+
+<div class="list-group">
+    {% for alert in alerts %}
+    <div class="list-group-item {% if not alert.is_read %}list-group-item-warning{% endif %}" id="alert-{{ alert.id }}">
+        <div class="d-flex w-100 justify-content-between align-items-start">
+            <div>
+                <h5 class="mb-1">
+                    <span class="badge bg-{{ 'danger' if alert.severity == 'critical' else 'warning' if alert.severity == 'high' else 'info' }}">
+                        {{ alert.severity.upper() }}
+                    </span>
+                    {{ alert.title }}
+                </h5>
+                <p class="mb-1">{{ alert.message }}</p>
+                <small class="text-muted">
+                    {{ alert.created_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                    {% if alert.source %}| Source: {{ alert.source }}{% endif %}
+                </small>
+            </div>
+            <div class="btn-group-vertical btn-group-sm">
+                {% if not alert.is_read %}
+                <button class="btn btn-outline-primary" onclick="markAsRead({{ alert.id }})">
+                    <i class="bi bi-check"></i>
+                </button>
+                {% endif %}
+                <button class="btn btn-outline-danger" onclick="deleteAlert({{ alert.id }})">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info">No alerts to display</div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function markAsRead(alertId) {
+    try {
+        const response = await fetch(`/alerts/${alertId}/read`, { method: 'POST' });
+        const data = await response.json();
+        if (data.success) {
+            location.reload();
+        }
+    } catch (error) {
+        console.error('Error marking alert as read:', error);
+    }
+}
+
+async function deleteAlert(alertId) {
+    if (!confirm('Delete this alert?')) return;
+    
+    try {
+        const response = await fetch(`/alerts/${alertId}/delete`, { method: 'DELETE' });
+        const data = await response.json();
+        if (data.success) {
+            document.getElementById(`alert-${alertId}`).remove();
+        }
+    } catch (error) {
+        console.error('Error deleting alert:', error);
+    }
+}
+
+async function clearAllAlerts() {
+    try {
+        const response = await fetch('/alerts/clear-all', { method: 'POST' });
+        const data = await response.json();
+        if (data.success) {
+            location.reload();
+        }
+    } catch (error) {
+        console.error('Error clearing alerts:', error);
+    }
+}
+</script>
+{% endblock %}

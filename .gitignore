@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Flask
+instance/
+.webassets-cache
+*.db
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+logs/
+*.log
+
+# Uploads
+uploads/*
+!uploads/.gitkeep
+
+# ML Models
+ml_models/*.pkl
+ml_models/*.h5
+ml_models/*.weights
+!ml_models/.gitkeep
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS
+.DS_Store
+Thumbs.db

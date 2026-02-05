@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - SafeHome{% endblock %}
+
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-speedometer2"></i> Dashboard</h2>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-primary">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-camera-video"></i> Cameras</h5>
+                <h2 class="card-text">{{ active_cameras }} / {{ cameras_count }}</h2>
+                <small>Active Cameras</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card text-white bg-danger">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-bell"></i> Alerts</h5>
+                <h2 class="card-text">{{ unread_alerts }}</h2>
+                <small>Unread Alerts</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card text-white bg-success">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-gear"></i> Rules</h5>
+                <h2 class="card-text">{{ active_rules }}</h2>
+                <small>Active Rules</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card text-white bg-info">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-shield-check"></i> Status</h5>
+                <h2 class="card-text">Active</h2>
+                <small>System Status</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-bell"></i> Recent Alerts</h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    {% for alert in recent_alerts %}
+                    <div class="list-group-item {% if not alert.is_read %}list-group-item-warning{% endif %}">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">{{ alert.title }}</h6>
+                            <small class="badge bg-{{ 'danger' if alert.severity == 'critical' else 'warning' if alert.severity == 'high' else 'info' }}">
+                                {{ alert.severity }}
+                            </small>
+                        </div>
+                        <p class="mb-1">{{ alert.message }}</p>
+                        <small>{{ alert.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">No recent alerts</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-graph-up"></i> Activity Chart</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="activityChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+fetch('/dashboard/stats')
+    .then(r => r.json())
+    .then(data => {
+        const ctx = document.getElementById('activityChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.hourly_detections.map(h => h.hour + ':00'),
+                datasets: [{
+                    label: 'Detections',
+                    data: data.hourly_detections.map(h => h.count),
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+    });
+</script>
+{% endblock %}

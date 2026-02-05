@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Profile - SafeHome{% endblock %}
+
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-person-circle"></i> Profile</h2>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>Account Information</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('auth.profile') }}">
+                    <input type="hidden" name="action" value="update_profile">
+                    
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Username</label>
+                        <input type="text" class="form-control" id="username" name="username" value="{{ current_user.username }}">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email" value="{{ current_user.email }}" disabled>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Role</label>
+                        <input type="text" class="form-control" value="{{ current_user.role }}" disabled>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Update Profile</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5>Change Password</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('auth.profile') }}">
+                    <input type="hidden" name="action" value="change_password">
+                    
+                    <div class="mb-3">
+                        <label for="current_password" class="form-label">Current Password</label>
+                        <input type="password" class="form-control" id="current_password" name="current_password" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="new_password" class="form-label">New Password</label>
+                        <input type="password" class="form-control" id="new_password" name="new_password" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="confirm_password" class="form-label">Confirm New Password</label>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-warning">Change Password</button>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h5>Two-Factor Authentication</h5>
+            </div>
+            <div class="card-body">
+                {% if current_user.mfa_enabled %}
+                    <p class="text-success"><i class="bi bi-check-circle"></i> Two-factor authentication is enabled</p>
+                    <form method="POST" action="{{ url_for('auth.disable_mfa') }}">
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Enter password to disable</label>
+                            <input type="password" class="form-control" id="password" name="password" required>
+                        </div>
+                        <button type="submit" class="btn btn-danger">Disable 2FA</button>
+                    </form>
+                {% else %}
+                    <p class="text-muted">Two-factor authentication is not enabled</p>
+                    <a href="{{ url_for('auth.setup_mfa') }}" class="btn btn-success">Enable 2FA</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

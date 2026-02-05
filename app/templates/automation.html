@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}Automation - SafeHome{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-gear"></i> Automation Rules</h2>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createRuleModal">
+        <i class="bi bi-plus-circle"></i> Create Rule
+    </button>
+</div>
+
+<div class="row">
+    {% for rule in rules %}
+    <div class="col-md-6 mb-3">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between">
+                <h5>{{ rule.name }}</h5>
+                <span class="badge bg-{{ 'success' if rule.is_active else 'secondary' }}">
+                    {{ 'Active' if rule.is_active else 'Inactive' }}
+                </span>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">{{ rule.description or 'No description' }}</p>
+                <p><strong>Trigger:</strong> {{ rule.trigger_type }}</p>
+                <p><strong>Actions:</strong> {{ rule.actions|length }}</p>
+                <p><small>Triggered {{ rule.trigger_count }} times</small></p>
+                
+                <div class="btn-group w-100 mt-2">
+                    <button class="btn btn-sm btn-outline-primary" onclick="toggleRule({{ rule.id }})">
+                        {{ 'Disable' if rule.is_active else 'Enable' }}
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteRule({{ rule.id }})">
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12">
+        <div class="alert alert-info">No automation rules configured</div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="modal fade" id="createRuleModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Create Automation Rule</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="ruleForm">
+                    <div class="mb-3">
+                        <label class="form-label">Rule Name</label>
+                        <input type="text" class="form-control" id="ruleName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" id="ruleDescription" rows="2"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Trigger Type</label>
+                        <select class="form-select" id="triggerType" required>
+                            <option value="sensor">Sensor Event</option>
+                            <option value="time">Time-based</option>
+                            <option value="user_action">User Action</option>
+                            <option value="anomaly">Anomaly Detected</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Action</label>
+                        <select class="form-select" id="actionType" required>
+                            <option value="send_alert">Send Alert</option>
+                            <option value="notify_user">Notify User</option>
+                            <option value="log_event">Log Event</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="createRule()">Create Rule</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function createRule() {
+    const rule = {
+        name: document.getElementById('ruleName').value,
+        description: document.getElementById('ruleDescription').value,
+        trigger_type: document.getElementById('triggerType').value,
+        trigger_config: {},
+        conditions: [],
+        actions: [{ type: document.getElementById('actionType').value }]
+    };
+    
+    try {
+        const response = await fetch('/automation/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(rule)
+        });
+        const data = await response.json();
+        if (data.success) {
+            location.reload();
+        }
+    } catch (error) {
+        console.error('Error creating rule:', error);
+    }
+}
+
+async function toggleRule(ruleId) {
+    try {
+        const response = await fetch(`/automation/${ruleId}/toggle`, { method: 'POST' });
+        const data = await response.json();
+        if (data.success) {
+            location.reload();
+        }
+    } catch (error) {
+        console.error('Error toggling rule:', error);
+    }
+}
+
+async function deleteRule(ruleId) {
+    if (!confirm('Delete this rule?')) return;
+    
+    try {
+        const response = await fetch(`/automation/${ruleId}/delete`, { method: 'DELETE' });
+        const data = await response.json();
+        if (data.success) {
+            location.reload();
+        }
+    } catch (error) {
+        console.error('Error deleting rule:', error);
+    }
+}
+</script>
+{% endblock %}

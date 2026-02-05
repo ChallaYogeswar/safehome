@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Setup Two-Factor Authentication - SafeHome{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h4><i class="bi bi-shield-lock"></i> Two-Factor Authentication</h4>
+            </div>
+            <div class="card-body">
+                <p>Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.):</p>
+                
+                <div class="text-center my-4">
+                    <img src="data:image/png;base64,{{ qr_code }}" alt="QR Code" class="img-fluid">
+                </div>
+                
+                <div class="alert alert-info">
+                    <strong>Manual Entry:</strong> {{ secret }}
+                </div>
+                
+                <form method="POST" action="{{ url_for('auth.setup_mfa') }}">
+                    <div class="mb-3">
+                        <label for="token" class="form-label">Enter verification code:</label>
+                        <input type="text" class="form-control" id="token" name="token" placeholder="000000" required autofocus>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-check-circle"></i> Enable Two-Factor Authentication
+                    </button>
+                </form>
+                
+                <div class="text-center mt-3">
+                    <a href="{{ url_for('dashboard.index') }}" class="text-muted">Skip for now</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
