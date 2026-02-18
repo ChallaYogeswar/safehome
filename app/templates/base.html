@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,7 +10,36 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}">
     {% block extra_css %}{% endblock %}
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-messaging.js"></script>
+    <script>
+        // Initialize Firebase
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY_PLACEHOLDER", // In prod, inject via config
+            authDomain: "{{ config.FIREBASE_PROJECT_ID }}.firebaseapp.com",
+            databaseURL: "{{ config.FIREBASE_DATABASE_URL }}",
+            projectId: "{{ config.FIREBASE_PROJECT_ID }}",
+            storageBucket: "{{ config.FIREBASE_STORAGE_BUCKET }}",
+            messagingSenderId: "YOUR_SENDER_ID_PLACEHOLDER",
+            appId: "YOUR_APP_ID_PLACEHOLDER"
+        };
+
+        // Initialize only if config is present and valid
+        if (firebaseConfig.projectId && firebaseConfig.projectId !== 'None') {
+            try {
+                firebase.initializeApp(firebaseConfig);
+                console.log('Firebase initialized');
+            } catch (e) {
+                console.error('Firebase init error', e);
+            }
+        } else {
+            console.warn('Firebase config missing — notifications disabled');
+        }
+    </script>
     <style>
         :root {
             --primary-blue: #0d6efd;
@@ -18,51 +48,114 @@
             --success-green: #198754;
             --warning-yellow: #ffc107;
         }
-        body { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); min-height: 100vh; }
-        .navbar { background: linear-gradient(90deg, #1a1a2e 0%, #0f3460 100%); box-shadow: 0 4px 6px rgba(0,0,0,0.15); }
-        .navbar-brand { font-weight: 700; font-size: 1.5rem; letter-spacing: 1px; }
-        .card { border: none; border-radius: 10px; transition: all 0.3s ease; }
-        .card:hover { transform: translateY(-5px); box-shadow: 0 8px 16px rgba(13, 110, 253, 0.15); }
+
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background: linear-gradient(90deg, #1a1a2e 0%, #0f3460 100%);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+        }
+
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.5rem;
+            letter-spacing: 1px;
+        }
+
+        .card {
+            border: none;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 16px rgba(13, 110, 253, 0.15);
+        }
     </style>
 </head>
+
 <body>
     {% if current_user.is_authenticated %}
-    <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4 sticky-top">
         <div class="container-fluid">
             <a class="navbar-brand" href="{{ url_for('dashboard.index') }}">
-                <i class="bi bi-shield-lock"></i> SafeHome
+                <i class="bi bi-shield-check"></i> SafeHome
             </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('dashboard.index') }}"><i class="bi bi-speedometer2"></i> Dashboard</a>
+                        <a class="nav-link {{ 'active' if request.endpoint == 'dashboard.index' }}"
+                            href="{{ url_for('dashboard.index') }}">
+                            <i class="bi bi-speedometer2"></i> Dashboard
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('camera.index') }}"><i class="bi bi-camera-video"></i> Cameras</a>
+                        <a class="nav-link {{ 'active' if request.endpoint == 'camera.index' }}"
+                            href="{{ url_for('camera.index') }}">
+                            <i class="bi bi-camera-video"></i> Cameras
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('alerts.index') }}"><i class="bi bi-bell"></i> Alerts <span class="badge bg-danger" id="unread-count" style="display:none;"></span></a>
+                        <a class="nav-link {{ 'active' if request.endpoint == 'face.list_enrolled_persons' }}"
+                            href="{{ url_for('face.list_enrolled_persons') }}">
+                            <i class="bi bi-people"></i> People
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('automation.index') }}"><i class="bi bi-gear"></i> Automation</a>
+                        <a class="nav-link {{ 'active' if request.endpoint == 'entries.index' }}"
+                            href="{{ url_for('entries.index') }}">
+                            <i class="bi bi-clock-history"></i> Entries
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('analytics.index') }}"><i class="bi bi-graph-up"></i> Analytics</a>
+                        <a class="nav-link {{ 'active' if request.endpoint == 'alerts.index' }}"
+                            href="{{ url_for('alerts.index') }}">
+                            <i class="bi bi-bell"></i> Alerts <span class="badge bg-danger" id="unread-count"
+                                style="display:none;"></span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ 'active' if request.endpoint == 'automation.index' }}"
+                            href="{{ url_for('automation.index') }}">
+                            <i class="bi bi-gear"></i> Automation
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ 'active' if request.endpoint == 'analytics.index' }}"
+                            href="{{ url_for('analytics.index') }}">
+                            <i class="bi bi-graph-up"></i> Analytics
+                        </a>
                     </li>
                 </ul>
                 <ul class="navbar-nav ms-auto">
+                    <li class="nav-item me-3">
+                        <a class="nav-link" href="#" id="enable-notifs-nav" title="Enable Notifications">
+                            <i class="bi bi-bell-slash"></i>
+                        </a>
+                    </li>
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
+                            data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-person-circle"></i> {{ current_user.username }}
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="{{ url_for('auth.profile') }}"><i class="bi bi-person"></i> Profile</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('auth.setup_mfa') }}"><i class="bi bi-shield-check"></i> Two-Factor Auth</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item text-danger" href="{{ url_for('auth.logout') }}"><i class="bi bi-door-left"></i> Logout</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('auth.profile') }}"><i
+                                        class="bi bi-person"></i> Profile</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('auth.setup_mfa') }}"><i
+                                        class="bi bi-shield-check"></i> Two-Factor Auth</a></li>
+                            <li>
+                                <hr class="dropdown-divider">
+                            </li>
+                            <li><a class="dropdown-item text-danger" href="{{ url_for('auth.logout') }}"><i
+                                        class="bi bi-door-left"></i> Logout</a></li>
                         </ul>
                     </li>
                 </ul>
@@ -73,15 +166,17 @@
 
     <div class="container-fluid {% if current_user.is_authenticated %}mt-4{% endif %}">
         {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
-                        <i class="bi bi-{% if category == 'error' %}exclamation-circle{% elif category == 'success' %}check-circle{% elif category == 'warning' %}exclamation-triangle{% else %}info-circle{% endif %}"></i>
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
+        {% if messages %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show"
+            role="alert">
+            <i
+                class="bi bi-{% if category == 'error' %}exclamation-circle{% elif category == 'success' %}check-circle{% elif category == 'warning' %}exclamation-triangle{% else %}info-circle{% endif %}"></i>
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+        {% endif %}
         {% endwith %}
 
         {% block content %}{% endblock %}
@@ -90,10 +185,11 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/notifications.js') }}"></script>
     {% if current_user.is_authenticated %}
     <script src="{{ url_for('static', filename='js/realtime.js') }}"></script>
     {% endif %}
     {% block extra_js %}{% endblock %}
 </body>
-</html>
 
+</html>

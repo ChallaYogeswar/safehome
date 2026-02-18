@@ -1,0 +1,475 @@
+{% extends "base.html" %}
+
+{% block title %}Entry History - SafeHome{% endblock %}
+
+{% block extra_css %}
+<style>
+    .entry-card {
+        border: none;
+        border-radius: 16px;
+        overflow: hidden;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        margin-bottom: 1rem;
+    }
+
+    .entry-card:hover {
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .entry-card.pending {
+        border-left: 4px solid #ffc107;
+    }
+
+    .entry-card.granted {
+        border-left: 4px solid #198754;
+    }
+
+    .entry-card.denied {
+        border-left: 4px solid #dc3545;
+    }
+
+    .entry-card.unknown {
+        border-left: 4px solid #dc3545;
+        background: rgba(220, 53, 69, 0.02);
+    }
+
+    .entry-thumbnail {
+        width: 80px;
+        height: 80px;
+        border-radius: 12px;
+        object-fit: cover;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .entry-thumbnail-placeholder {
+        width: 80px;
+        height: 80px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.5rem;
+    }
+
+    .action-badge {
+        font-size: 0.75rem;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-weight: 600;
+    }
+
+    .action-door_opened {
+        background: rgba(25, 135, 84, 0.1);
+        color: #198754;
+    }
+
+    .action-entry_denied {
+        background: rgba(220, 53, 69, 0.1);
+        color: #dc3545;
+    }
+
+    .action-pending_approval {
+        background: rgba(255, 193, 7, 0.15);
+        color: #b58900;
+    }
+
+    .action-alert_sent {
+        background: rgba(13, 110, 253, 0.1);
+        color: #0d6efd;
+    }
+
+    .confidence-bar {
+        height: 4px;
+        border-radius: 2px;
+        background: #e9ecef;
+        margin-top: 4px;
+    }
+
+    .confidence-fill {
+        height: 100%;
+        border-radius: 2px;
+        transition: width 0.6s ease;
+    }
+
+    .confidence-high {
+        background: linear-gradient(90deg, #43e97b, #38f9d7);
+    }
+
+    .confidence-medium {
+        background: linear-gradient(90deg, #ffc107, #ff9800);
+    }
+
+    .confidence-low {
+        background: linear-gradient(90deg, #dc3545, #ff6b6b);
+    }
+
+    .filter-pills .btn {
+        border-radius: 20px;
+        padding: 0.3rem 1rem;
+        font-size: 0.85rem;
+        margin-right: 0.5rem;
+        transition: all 0.2s;
+    }
+
+    .filter-pills .btn.active {
+        transform: scale(1.05);
+    }
+
+    .stats-bar {
+        background: linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);
+        border-radius: 16px;
+        padding: 1.25rem 1.5rem;
+        color: white;
+        margin-bottom: 1.5rem;
+    }
+
+    .stats-bar .stat-item {
+        text-align: center;
+    }
+
+    .stats-bar .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+    }
+
+    .stats-bar .stat-label {
+        font-size: 0.75rem;
+        opacity: 0.7;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .load-more-btn {
+        border-radius: 12px;
+        padding: 0.75rem 2rem;
+    }
+
+    .empty-entries {
+        text-align: center;
+        padding: 4rem 2rem;
+        color: #6c757d;
+    }
+
+    .empty-entries i {
+        font-size: 4rem;
+        opacity: 0.3;
+        margin-bottom: 1rem;
+    }
+
+    .entry-time {
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+
+    .approval-buttons .btn {
+        border-radius: 12px;
+        padding: 0.35rem 1rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-clock-history"></i> Entry History</h2>
+    <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary btn-sm" id="refreshBtn" style="border-radius: 12px;"
+            onclick="loadEntries(true)">
+            <i class="bi bi-arrow-clockwise"></i> Refresh
+        </button>
+    </div>
+</div>
+
+<!-- Stats Bar -->
+<div class="stats-bar" id="statsBar">
+    <div class="row">
+        <div class="col stat-item">
+            <div class="stat-value" id="statToday">0</div>
+            <div class="stat-label">Today</div>
+        </div>
+        <div class="col stat-item">
+            <div class="stat-value" id="statKnown">0</div>
+            <div class="stat-label">Known</div>
+        </div>
+        <div class="col stat-item">
+            <div class="stat-value" id="statUnknown">0</div>
+            <div class="stat-label">Unknown</div>
+        </div>
+        <div class="col stat-item">
+            <div class="stat-value" id="statGranted">0</div>
+            <div class="stat-label">Granted</div>
+        </div>
+        <div class="col stat-item">
+            <div class="stat-value text-warning" id="statPending">0</div>
+            <div class="stat-label">Pending</div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="filter-pills mb-3">
+    <button class="btn btn-outline-light btn-sm active" data-filter=""
+        style="background: #1a1a2e; color: white;">All</button>
+    <button class="btn btn-outline-success btn-sm" data-filter="is_known=true">Known</button>
+    <button class="btn btn-outline-danger btn-sm" data-filter="is_known=false">Unknown</button>
+    <button class="btn btn-outline-warning btn-sm" data-filter="action=pending_approval">Pending</button>
+    <button class="btn btn-outline-primary btn-sm" data-filter="action=door_opened">Door Opened</button>
+    <button class="btn btn-outline-secondary btn-sm" data-filter="action=entry_denied">Denied</button>
+</div>
+
+<!-- Entry List -->
+<div id="entriesList">
+    <!-- Populated by JavaScript -->
+</div>
+
+<!-- Empty State -->
+<div class="empty-entries" id="emptyEntries" style="display: none;">
+    <i class="bi bi-inbox d-block"></i>
+    <h4>No Entries Yet</h4>
+    <p>Entry logs will appear here when faces are detected by your cameras.</p>
+</div>
+
+<!-- Load More -->
+<div class="text-center mt-3" id="loadMoreContainer" style="display: none;">
+    <button class="btn btn-outline-primary load-more-btn" id="loadMoreBtn" onclick="loadMore()">
+        <i class="bi bi-arrow-down"></i> Load More
+    </button>
+</div>
+
+<!-- Loading Spinner -->
+<div class="text-center mt-4" id="loadingSpinner" style="display: none;">
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentOffset = 0;
+    const PAGE_SIZE = 25;
+    let currentFilter = '';
+    let isLoading = false;
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+        loadEntries(true);
+        loadStats();
+        setupFilters();
+    });
+
+    function setupFilters() {
+        document.querySelectorAll('.filter-pills .btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.filter-pills .btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentFilter = btn.dataset.filter;
+                loadEntries(true);
+            });
+        });
+    }
+
+    async function loadEntries(reset = false) {
+        if (isLoading) return;
+        isLoading = true;
+
+        if (reset) {
+            currentOffset = 0;
+            document.getElementById('entriesList').innerHTML = '';
+        }
+
+        document.getElementById('loadingSpinner').style.display = 'block';
+
+        try {
+            let url = `/entries/list?limit=${PAGE_SIZE}&offset=${currentOffset}`;
+            if (currentFilter) url += `&${currentFilter}`;
+
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (data.success) {
+                renderEntries(data.entries);
+                currentOffset += data.entries.length;
+
+                document.getElementById('loadMoreContainer').style.display = data.has_more ? 'block' : 'none';
+                document.getElementById('emptyEntries').style.display =
+                    (currentOffset === 0 && data.entries.length === 0) ? 'block' : 'none';
+            }
+        } catch (error) {
+            console.error('Error loading entries:', error);
+        } finally {
+            isLoading = false;
+            document.getElementById('loadingSpinner').style.display = 'none';
+        }
+    }
+
+    function loadMore() {
+        loadEntries(false);
+    }
+
+    async function loadStats() {
+        try {
+            const response = await fetch('/entries/stats');
+            const data = await response.json();
+
+            if (data.success) {
+                const s = data.stats;
+                document.getElementById('statToday').textContent = s.today.total;
+                document.getElementById('statKnown').textContent = s.today.known;
+                document.getElementById('statUnknown').textContent = s.today.unknown;
+                document.getElementById('statGranted').textContent = s.today.access_granted;
+                document.getElementById('statPending').textContent = s.pending_approvals;
+            }
+        } catch (error) {
+            console.error('Error loading stats:', error);
+        }
+    }
+
+    function renderEntries(entries) {
+        const container = document.getElementById('entriesList');
+
+        entries.forEach(entry => {
+            const card = document.createElement('div');
+            const statusClass = entry.action === 'pending_approval' || entry.action === 'alert_sent' ? 'pending' :
+                entry.access_granted ? 'granted' : 'denied';
+            const isUnknown = !entry.is_known;
+
+            card.className = `card entry-card ${statusClass} ${isUnknown ? 'unknown' : ''}`;
+            card.innerHTML = `
+                <div class="card-body">
+                    <div class="d-flex align-items-start">
+                        <div class="me-3">
+                            ${entry.firebase_image_url || entry.image_path ?
+                    `<img src="${entry.firebase_image_url || entry.image_path}" class="entry-thumbnail" alt="Entry photo" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                 <div class="entry-thumbnail-placeholder" style="display:none;"><i class="bi bi-person"></i></div>` :
+                    `<div class="entry-thumbnail-placeholder"><i class="bi bi-person"></i></div>`
+                }
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h6 class="mb-1">${entry.person_name || 'Unknown Person'}</h6>
+                                    <div class="entry-time">
+                                        <i class="bi bi-camera-video"></i> ${entry.camera_name || 'Camera ' + entry.camera_id}
+                                        &nbsp;·&nbsp;
+                                        <i class="bi bi-clock"></i> ${formatTimestamp(entry.timestamp)}
+                                    </div>
+                                </div>
+                                <div class="text-end">
+                                    <span class="action-badge action-${entry.action}">
+                                        ${formatAction(entry.action)}
+                                    </span>
+                                    ${entry.is_known ?
+                    `<div class="mt-1">
+                                            <small class="text-muted">Confidence: ${Math.round((entry.confidence || 0) * 100)}%</small>
+                                            <div class="confidence-bar">
+                                                <div class="confidence-fill ${getConfidenceClass(entry.confidence)}" style="width: ${Math.round((entry.confidence || 0) * 100)}%"></div>
+                                            </div>
+                                        </div>` : ''
+                }
+                                </div>
+                            </div>
+                            ${(entry.action === 'pending_approval' || entry.action === 'alert_sent') && !entry.access_granted ?
+                    `<div class="approval-buttons mt-2">
+                                    <button class="btn btn-success btn-sm me-2" onclick="approveEntry(${entry.id})">
+                                        <i class="bi bi-check-lg"></i> Approve
+                                    </button>
+                                    <button class="btn btn-outline-danger btn-sm" onclick="denyEntry(${entry.id})">
+                                        <i class="bi bi-x-lg"></i> Deny
+                                    </button>
+                                </div>` : ''
+                }
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            container.appendChild(card);
+        });
+    }
+
+    function formatTimestamp(isoString) {
+        if (!isoString) return 'Unknown time';
+        const d = new Date(isoString);
+        const now = new Date();
+        const diffMs = now - d;
+        const diffMins = Math.floor(diffMs / 60000);
+
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`;
+        return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function formatAction(action) {
+        const map = {
+            'door_opened': '🔓 Door Opened',
+            'entry_denied': '🔒 Denied',
+            'pending_approval': '⏳ Pending',
+            'alert_sent': '🔔 Alert Sent'
+        };
+        return map[action] || action;
+    }
+
+    function getConfidenceClass(confidence) {
+        if (confidence >= 0.8) return 'confidence-high';
+        if (confidence >= 0.5) return 'confidence-medium';
+        return 'confidence-low';
+    }
+
+    async function approveEntry(entryId) {
+        try {
+            const response = await fetch(`/entries/approve/${entryId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                showToast('success', data.message);
+                loadEntries(true);
+                loadStats();
+            } else {
+                showToast('error', data.message);
+            }
+        } catch (error) {
+            showToast('error', 'Failed to approve entry');
+        }
+    }
+
+    async function denyEntry(entryId) {
+        try {
+            const response = await fetch(`/entries/deny/${entryId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                showToast('success', data.message);
+                loadEntries(true);
+                loadStats();
+            } else {
+                showToast('error', data.message);
+            }
+        } catch (error) {
+            showToast('error', 'Failed to deny entry');
+        }
+    }
+
+    function showToast(type, message) {
+        const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+        const icon = type === 'success' ? 'bi-check-circle' : 'bi-exclamation-circle';
+        const toast = document.createElement('div');
+        toast.className = `alert ${alertClass} alert-dismissible fade show position-fixed`;
+        toast.style.cssText = 'top: 80px; right: 20px; z-index: 9999; min-width: 300px; border-radius: 12px;';
+        toast.innerHTML = `<i class="bi ${icon}"></i> ${message} <button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 4000);
+    }
+</script>
+{% endblock %}

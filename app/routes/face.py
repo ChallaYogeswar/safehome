@@ -1,5 +1,6 @@
 """
 Face Recognition & Access Control Routes
+Integrated with Firebase, Notifications, and Door Control services
 """
 
 from flask import Blueprint, request, jsonify
@@ -9,11 +10,13 @@ import os
 from datetime import datetime, timezone
 from PIL import Image
 import io
+import logging
 
 from app.models import Camera, FacePerson, FaceEncoding, AccessLog, db
 from app.services.face_recognition_service import FaceRecognitionService
 
 bp = Blueprint('face', __name__, url_prefix='/face')
+logger = logging.getLogger(__name__)
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 UPLOAD_FOLDER = 'uploads/faces'
@@ -25,6 +28,9 @@ def allowed_file(filename):
 def ensure_upload_folder():
     if not os.path.exists(UPLOAD_FOLDER):
         os.makedirs(UPLOAD_FOLDER)
+    entries_folder = 'uploads/entries'
+    if not os.path.exists(entries_folder):
+        os.makedirs(entries_folder)
 
 @bp.route('/enroll', methods=['POST'])
 @login_required
@@ -76,6 +82,38 @@ def enroll_person():
         )
         
         if result['success']:
+            # Sync to Firebase
+            try:
+                from app.services.firebase_service import FirebaseService
+                firebase_service = FirebaseService()
+                
+                person = FacePerson.query.get(result['person_id'])
+                if person and firebase_service.is_enabled:
+                    firebase_id = firebase_service.sync_person({
+                        'id': str(person.id),
+                        'name': person.name,
+                        'relation': person.relation,
+                        'is_resident': person.is_resident,
+                        'enrolled_date': int(person.created_at.timestamp() * 1000),
+                        'encoding_count': result.get('encoding_count', 0)
+                    })
+                    
+                    # Update person with Firebase ID
+                    if firebase_id:
+                        person.firebase_id = firebase_id
+                        db.session.commit()
+                    
+                    # Upload profile image to Firebase Storage
+                    if saved_paths:
+                        firebase_url = firebase_service.upload_image(
+                            saved_paths[0],
+                            f'faces/{person.id}/profile.jpg'
+                        )
+                        logger.info(f"Profile image uploaded to Firebase: {firebase_url}")
+                        
+            except Exception as e:
+                logger.warning(f"Firebase sync failed (non-critical): {e}")
+            
             return jsonify(result), 201
         else:
             # Clean up files if enrollment failed
@@ -85,6 +123,7 @@ def enroll_person():
             return jsonify(result), 400
     
     except Exception as e:
+        logger.error(f"Enrollment error: {e}")
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
 
 @bp.route('/enrolled', methods=['GET'])
@@ -102,7 +141,20 @@ def list_enrolled_persons():
 def delete_enrolled_person(person_id):
     """Delete an enrolled person"""
     try:
+        # Get person before deletion for Firebase cleanup
+        person = FacePerson.query.filter_by(id=person_id, user_id=current_user.id).first()
+        firebase_id = person.firebase_id if person else None
+        
         result = FaceRecognitionService.delete_enrolled_person(person_id, current_user.id)
+        
+        if result['success'] and firebase_id:
+            try:
+                from app.services.firebase_service import FirebaseService
+                firebase_service = FirebaseService()
+                firebase_service.delete_person(firebase_id)
+            except Exception as e:
+                logger.warning(f"Firebase delete failed (non-critical): {e}")
+        
         status = 200 if result['success'] else 404
         return jsonify(result), status
     except Exception as e:
@@ -115,13 +167,12 @@ def recognize():
     Recognize a face from uploaded image or camera frame
     POST /face/recognize
     
-    JSON:
     - camera_id: int (required)
-    - image_data: str (base64 image, required) OR
-    - image_file: file (image file)
+    - image: file (image file) OR
+    - image_data: str (base64 image)
     """
     try:
-        camera_id = request.form.get('camera_id') or request.json.get('camera_id')
+        camera_id = request.form.get('camera_id') or (request.json or {}).get('camera_id')
         
         if not camera_id:
             return jsonify({'success': False, 'message': 'camera_id required'}), 400
@@ -134,14 +185,13 @@ def recognize():
             return jsonify({'success': False, 'message': 'Camera not found'}), 404
         
         # Get image
-        image_data = None
         image_path = None
         
         if 'image' in request.files:
             file = request.files['image']
             if file and allowed_file(file.filename):
                 filename = secure_filename(f"recognition_{datetime.now(timezone.utc).timestamp()}_{file.filename}")
-                image_path = os.path.join(UPLOAD_FOLDER, filename)
+                image_path = os.path.join('uploads/entries', filename)
                 file.save(image_path)
         elif 'image_data' in request.form:
             import base64
@@ -152,7 +202,7 @@ def recognize():
                 image_bytes = base64.b64decode(image_data)
                 image = Image.open(io.BytesIO(image_bytes))
                 filename = f"recognition_{datetime.now(timezone.utc).timestamp()}.jpg"
-                image_path = os.path.join(UPLOAD_FOLDER, filename)
+                image_path = os.path.join('uploads/entries', filename)
                 image.save(image_path)
             except Exception as e:
                 return jsonify({'success': False, 'message': f'Invalid image data: {str(e)}'}), 400
@@ -174,13 +224,113 @@ def recognize():
         # Recognize face
         recognition_result = FaceRecognitionService.recognize_face(camera_id, test_encoding)
         
+        # ── Firebase Integration ──────────────────────────────
+        firebase_image_url = None
+        firebase_entry_id = None
+        
+        try:
+            from app.services.firebase_service import FirebaseService
+            firebase_service = FirebaseService()
+            
+            # Upload image to Firebase Storage
+            if firebase_service.is_enabled:
+                firebase_image_url = firebase_service.upload_image(
+                    image_path,
+                    f'entries/{os.path.basename(image_path)}'
+                )
+        except Exception as e:
+            logger.warning(f"Firebase image upload failed: {e}")
+        
+        # ── Door Control Decision ─────────────────────────────
+        door_result = {'action': 'alert_sent', 'access_granted': False}
+        
+        try:
+            from app.services.door_control_service import DoorControlService
+            door_service = DoorControlService()
+            door_result = door_service.process_recognition(recognition_result, camera_id, image_path)
+        except Exception as e:
+            logger.warning(f"Door control not available: {e}")
+        
+        # ── Log Entry ─────────────────────────────────────────
+        access_log = AccessLog(
+            camera_id=camera_id,
+            person_id=recognition_result.get('person_id'),
+            person_name=recognition_result.get('person_name', 'Unknown'),
+            is_known=recognition_result.get('is_known', False),
+            confidence=recognition_result.get('confidence', 0.0),
+            image_path=image_path,
+            firebase_image_url=firebase_image_url,
+            access_granted=door_result.get('access_granted', False),
+            action=door_result.get('action', 'alert_sent')
+        )
+        db.session.add(access_log)
+        db.session.flush()
+        
+        # Log to Firebase
+        try:
+            if firebase_service and firebase_service.is_enabled:
+                entry_data = {
+                    'person_id': str(recognition_result.get('person_id', '')),
+                    'person_name': recognition_result.get('person_name', 'Unknown'),
+                    'camera_id': str(camera_id),
+                    'is_known': recognition_result.get('is_known', False),
+                    'confidence': recognition_result.get('confidence', 0.0),
+                    'action': door_result.get('action', 'alert_sent'),
+                    'timestamp': int(datetime.now(timezone.utc).timestamp() * 1000),
+                    'image_url': firebase_image_url
+                }
+                firebase_entry_id = firebase_service.log_entry(entry_data)
+                
+                if firebase_entry_id:
+                    access_log.firebase_id = firebase_entry_id
+        except Exception as e:
+            logger.warning(f"Firebase entry log failed: {e}")
+        
+        db.session.commit()
+        
+        # ── Send Notification ─────────────────────────────────
+        try:
+            is_known = recognition_result.get('is_known', False)
+            is_resident = recognition_result.get('is_resident', False)
+            
+            # Notify if unknown person or non-resident
+            if not is_known or (is_known and not is_resident):
+                from app.services.notification_service import NotificationService
+                notif_service = NotificationService()
+                notif_service.send_entry_alert({
+                    'person_name': recognition_result.get('person_name', 'Unknown'),
+                    'camera_id': camera.name,
+                    'is_known': is_known,
+                    'confidence': recognition_result.get('confidence', 0.0),
+                    'image_url': firebase_image_url,
+                    'entry_id': firebase_entry_id or str(access_log.id),
+                    'timestamp': int(datetime.now(timezone.utc).timestamp() * 1000)
+                })
+        except Exception as e:
+            logger.warning(f"Notification failed: {e}")
+        
+        # Update person's recognition stats
+        if recognition_result.get('is_known') and recognition_result.get('person_id'):
+            try:
+                person = FacePerson.query.get(recognition_result['person_id'])
+                if person:
+                    person.recognition_count = (person.recognition_count or 0) + 1
+                    person.last_recognized = datetime.now(timezone.utc)
+                    db.session.commit()
+            except Exception as e:
+                logger.warning(f"Failed to update recognition stats: {e}")
+        
         return jsonify({
             'success': True,
             'recognition': recognition_result,
-            'image_path': image_path
+            'door_action': door_result,
+            'entry_id': access_log.id,
+            'firebase_entry_id': firebase_entry_id,
+            'image_url': firebase_image_url or image_path
         }), 200
     
     except Exception as e:
+        logger.error(f"Recognition error: {e}")
         return jsonify({'success': False, 'message': f'Error: {str(e)}'}), 500
 
 @bp.route('/access-log', methods=['GET'])
@@ -217,6 +367,8 @@ def access_log():
                 'confidence': log.confidence,
                 'access_granted': log.access_granted,
                 'action': log.action,
+                'approved_by': log.approved_by,
+                'firebase_image_url': log.firebase_image_url,
                 'timestamp': log.timestamp.isoformat(),
                 'image_path': log.image_path
             }
@@ -296,6 +448,7 @@ def stats():
                         'person_name': log.person_name,
                         'is_known': log.is_known,
                         'access_granted': log.access_granted,
+                        'action': log.action,
                         'timestamp': log.timestamp.isoformat()
                     }
                     for log in recent_access

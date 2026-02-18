@@ -20,6 +20,7 @@ instance/
 # Environment
 .env
 .env.local
+firebase-credentials.json
 
 # IDE
 .vscode/
@@ -55,3 +56,7 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+# Firebase/Google Services (sensitive credentials)
+google-services.json
+home-security-applicatio-8aa8b-firebase-adminsdk.json
+*.firebase.json

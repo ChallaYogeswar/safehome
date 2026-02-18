@@ -32,6 +32,27 @@ class Config:
     DETECTION_CONFIDENCE = 0.5
     MOTION_THRESHOLD = 25
     FRAME_SKIP = 2
+    
+    # Firebase Configuration
+    FIREBASE_CREDENTIALS_PATH = os.getenv('FIREBASE_CREDENTIALS_PATH')
+    FIREBASE_DATABASE_URL = os.getenv('FIREBASE_DATABASE_URL')
+    FIREBASE_STORAGE_BUCKET = os.getenv('FIREBASE_STORAGE_BUCKET')
+    FIREBASE_PROJECT_ID = os.getenv('FIREBASE_PROJECT_ID')
+    
+    # Face Recognition Settings
+    FACE_RECOGNITION_TOLERANCE = float(os.getenv('FACE_RECOGNITION_TOLERANCE', 0.6))
+    MIN_FACE_ENCODINGS = int(os.getenv('MIN_FACE_ENCODINGS', 2))
+    MAX_FACES_PER_FRAME = int(os.getenv('MAX_FACES_PER_FRAME', 5))
+    
+    # Notification Settings
+    ENABLE_PUSH_NOTIFICATIONS = os.getenv('ENABLE_PUSH_NOTIFICATIONS', 'true').lower() == 'true'
+    ENABLE_EMAIL_NOTIFICATIONS = os.getenv('ENABLE_EMAIL_NOTIFICATIONS', 'true').lower() == 'true'
+    NOTIFICATION_QUIET_HOURS = os.getenv('NOTIFICATION_QUIET_HOURS', '22:00-07:00')
+    
+    # Door Control Settings
+    AUTO_OPEN_RESIDENTS = os.getenv('AUTO_OPEN_RESIDENTS', 'true').lower() == 'true'
+    AUTO_OPEN_DURATION = int(os.getenv('AUTO_OPEN_DURATION', 5))
+    REQUIRE_APPROVAL_FOR_GUESTS = os.getenv('REQUIRE_APPROVAL_FOR_GUESTS', 'true').lower() == 'true'
 
 class DevelopmentConfig(Config):
     DEBUG = True

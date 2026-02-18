@@ -19,6 +19,35 @@ migrate = Migrate()
 jwt = JWTManager()
 mail = Mail()
 
+def init_firebase(app):
+    """Initialize Firebase Admin SDK (graceful fallback if not configured)"""
+    try:
+        import firebase_admin
+        from firebase_admin import credentials
+        
+        cred_path = app.config.get('FIREBASE_CREDENTIALS_PATH')
+        db_url = app.config.get('FIREBASE_DATABASE_URL')
+        storage_bucket = app.config.get('FIREBASE_STORAGE_BUCKET')
+        
+        if not cred_path or not os.path.exists(cred_path):
+            app.logger.warning("⚠️ Firebase credentials not found — Firebase features disabled")
+            app.config['FIREBASE_ENABLED'] = False
+            return
+        
+        if not firebase_admin._apps:
+            cred = credentials.Certificate(cred_path)
+            firebase_admin.initialize_app(cred, {
+                'databaseURL': db_url,
+                'storageBucket': storage_bucket
+            })
+            app.logger.info("✅ Firebase initialized successfully")
+        
+        app.config['FIREBASE_ENABLED'] = True
+        
+    except Exception as e:
+        app.logger.error(f"❌ Firebase initialization failed: {e}")
+        app.config['FIREBASE_ENABLED'] = False
+
 def create_app(config_name='default'):
     app = Flask(__name__, static_folder='static', static_url_path='/static')
     app.config.from_object(config[config_name])
@@ -32,6 +61,9 @@ def create_app(config_name='default'):
     mail.init_app(app)
     CORS(app)
     
+    # Initialize Firebase
+    init_firebase(app)
+    
     login_manager.login_view = 'auth.login'
     login_manager.login_message = 'Please log in to access this page.'
     
@@ -40,6 +72,7 @@ def create_app(config_name='default'):
         return User.query.get(int(user_id))
     
     from app.routes import auth, dashboard, camera, alerts, automation, analytics, api_docs, face
+    from app.routes import entries, notifications
     app.register_blueprint(auth.bp)
     app.register_blueprint(dashboard.bp)
     app.register_blueprint(camera.bp)
@@ -47,6 +80,8 @@ def create_app(config_name='default'):
     app.register_blueprint(automation.bp)
     app.register_blueprint(analytics.bp)
     app.register_blueprint(face.bp)
+    app.register_blueprint(entries.bp)
+    app.register_blueprint(notifications.bp)
     app.register_blueprint(api_docs.api_docs_bp)
     app.register_blueprint(api_docs.swaggerui_blueprint, url_prefix=api_docs.SWAGGER_URL)
     
@@ -96,3 +131,4 @@ def create_app(config_name='default'):
             scheduler.init_app(app)
     
     return app
+

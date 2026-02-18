@@ -1,0 +1,115 @@
+/* Mobile Responsive Styles for SafeHome */
+
+@media (max-width: 768px) {
+    /* General Layout */
+    .container-fluid {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+
+    h2 {
+        font-size: 1.5rem;
+    }
+
+    /* Navigation */
+    .navbar-collapse {
+        background: white;
+        padding: 1rem;
+        border-radius: 0 0 16px 16px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    }
+
+    /* Dashboard Grid */
+    .row > [class*='col-'] {
+        margin-bottom: 1rem;
+    }
+
+    /* Cards */
+    .card {
+        margin-bottom: 1rem;
+    }
+
+    /* People Page */
+    .person-card {
+        margin-bottom: 0.5rem;
+    }
+    
+    .enrollment-zone {
+        padding: 2rem 1rem;
+    }
+
+    /* Entries Page */
+    .entry-card .entry-thumbnail {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .entry-card h6 {
+        font-size: 0.95rem;
+    }
+    
+    .entry-time {
+        font-size: 0.75rem;
+    }
+    
+    .action-badge {
+        font-size: 0.7rem;
+        padding: 0.2rem 0.6rem;
+    }
+
+    .approval-buttons .btn {
+        width: 100%;
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+    
+    .approval-buttons .btn:last-child {
+        margin-bottom: 0;
+    }
+
+    /* Stats Bar */
+    .stats-bar {
+        padding: 1rem;
+        overflow-x: auto;
+        white-space: nowrap;
+        display: flex;
+        gap: 1rem;
+    }
+    
+    .stats-bar .stat-item {
+        flex: 0 0 auto;
+        min-width: 80px;
+    }
+    
+    .stats-bar .stat-value {
+        font-size: 1.25rem;
+    }
+
+    /* Tables */
+    .table-responsive {
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    /* Modals */
+    .modal-dialog {
+        margin: 0.5rem;
+    }
+    
+    .modal-content {
+        border-radius: 16px;
+    }
+
+    /* Toasts */
+    .toast-container, .alert-dismissible.position-fixed {
+        left: 1rem !important;
+        right: 1rem !important;
+        width: auto !important;
+        min-width: 0 !important;
+    }
+}
+
+/* Touch Targets */
+button, .btn, .nav-link, input, select {
+    min-height: 44px;
+}

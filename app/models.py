@@ -33,6 +33,7 @@ class User(UserMixin, db.Model):
     cameras = db.relationship('Camera', backref='owner', lazy='dynamic', cascade='all, delete-orphan')
     alerts = db.relationship('Alert', backref='user', lazy='dynamic', cascade='all, delete-orphan')
     rules = db.relationship('AutomationRule', backref='user', lazy='dynamic', cascade='all, delete-orphan')
+    device_tokens = db.relationship('DeviceToken', backref='user', lazy='dynamic', cascade='all, delete-orphan')
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -49,6 +50,19 @@ class User(UserMixin, db.Model):
             return False
         totp = pyotp.TOTP(self.mfa_secret)
         return totp.verify(token, valid_window=1)
+
+class DeviceToken(db.Model):
+    """Firebase device tokens for push notifications"""
+    __tablename__ = 'device_tokens'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    token = db.Column(db.String(255), unique=True, nullable=False)
+    device_type = db.Column(db.String(20))  # ios, android, web
+    device_name = db.Column(db.String(100))
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=utc_now)
+    last_used = db.Column(db.DateTime)
 
 class Camera(db.Model):
     __tablename__ = 'cameras'
@@ -186,6 +200,7 @@ class FacePerson(db.Model):
     is_resident = db.Column(db.Boolean, default=True)  # Can they access/open doors?
     
     profile_image = db.Column(db.String(500))  # Path to main profile photo
+    firebase_id = db.Column(db.String(100))  # Firebase Realtime DB sync ID
     face_encodings = db.relationship('FaceEncoding', backref='person', lazy='dynamic', cascade='all, delete-orphan')
     
     recognition_count = db.Column(db.Integer, default=0)
@@ -219,7 +234,10 @@ class AccessLog(db.Model):
     confidence = db.Column(db.Float)
     
     image_path = db.Column(db.String(500))
+    firebase_id = db.Column(db.String(100))  # Firebase entry ID for sync
+    firebase_image_url = db.Column(db.String(500))  # Firebase Storage public URL
     access_granted = db.Column(db.Boolean, default=False)
-    action = db.Column(db.String(50))  # 'door_opened', 'door_denied', 'alert_sent'
+    action = db.Column(db.String(50))  # 'door_opened', 'door_denied', 'alert_sent', 'pending_approval'
+    approved_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     
     timestamp = db.Column(db.DateTime, default=utc_now, index=True)
